@@ -101,6 +101,7 @@ class LCFS_BERT(nn.Module):
                 for i,dist in enumerate(distances_i):
                     if dist > mask_len:
                         masked_text_raw_indices[text_i][i] = np.zeros((self.hidden), dtype=np.float)
+                        #ansgdjhsgdaaj
 
         masked_text_raw_indices = torch.from_numpy(masked_text_raw_indices)
         return masked_text_raw_indices.to(self.opt.device)

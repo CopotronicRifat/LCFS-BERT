@@ -81,7 +81,11 @@ class LCFS_BERT(nn.Module):
         aspect_indices = inputs[3]
         spc_out = self.bert_spc(text_bert_indices, bert_segments_ids)
         spc_att = spc_out[-1][-1]
-        return spc_att
+
+        attention_scores = spc_att.sum(dim=1).mean(dim=-1)  # This is just an example, adjust as needed
+        
+        return attention_scores
+
 
     def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
         texts = text_local_indices.cpu().numpy()
@@ -99,8 +103,9 @@ class LCFS_BERT(nn.Module):
         for batch_i in range(text_local_indices.size(0)):
             mean_attention = attention_scores[batch_i].mean().item()
             for token_i in range(text_local_indices.size(1)):
-                if attention_scores[batch_i][token_i].item() < mean_attention:
+                if attention_scores[batch_i, token_i].item() < mean_attention:  
                     masked_text_raw_indices[batch_i][token_i] = np.zeros((self.hidden), dtype=np.float)
+
 
         return masked_text_raw_indices.to(self.opt.device)
 

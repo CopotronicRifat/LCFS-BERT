@@ -84,7 +84,7 @@ class LCFS_BERT(nn.Module):
                                           dtype=np.float32) # batch x seq x hidden size
 
         # 1. Calculate the attention scores of all the tokens.
-        # Note: You should ensure that the forward pass of your model returns attention scores. Here, we assume it's done.
+      
         _, attention_scores, _ = self.forward((text_local_indices, None, text_local_indices, aspect_indices, distances_input), output_attentions=True)
         
         for batch_i in range(text_local_indices.size(0)):

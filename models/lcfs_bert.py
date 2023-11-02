@@ -75,9 +75,11 @@ class LCFS_BERT(nn.Module):
     def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
         texts = text_local_indices.cpu().numpy()
         asps = aspect_indices.cpu().numpy()
-        if distances_input is not None:
+        
+        if isinstance(distances_input, torch.Tensor):  # Check if distances_input is a PyTorch tensor
             distances_input = distances_input.cpu().numpy()
-            
+        # Else, assume it's already a numpy array or None, so don't need to convert
+
         masked_text_raw_indices = np.ones((text_local_indices.size(0), self.opt.max_seq_len, self.hidden),
                                           dtype=np.float32) # batch x seq x hidden size
 
@@ -97,6 +99,7 @@ class LCFS_BERT(nn.Module):
                     masked_text_raw_indices[batch_i][token_i] = np.zeros((self.hidden), dtype=np.float)
 
         return masked_text_raw_indices.to(self.opt.device)
+
 
 
 

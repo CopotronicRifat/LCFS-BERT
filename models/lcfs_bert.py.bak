@@ -72,41 +72,32 @@ class LCFS_BERT(nn.Module):
         self.bert_pooler = BertPooler(sa_config)
         self.dense = nn.Linear(hidden, opt.polarities_dim)
 
-    def feature_dynamic_mask(self, text_local_indices, aspect_indices, attention_scores=None):
-        texts = text_local_indices.cpu().numpy()  # batch_size x seq_len
-        asps = aspect_indices.cpu().numpy()  # batch_size x aspect_len
+    def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
+        texts = text_local_indices.cpu().numpy()
+        asps = aspect_indices.cpu().numpy()
+        if distances_input is not None:
+            distances_input = distances_input.cpu().numpy()
+            
+        masked_text_raw_indices = np.ones((text_local_indices.size(0), self.opt.max_seq_len, self.hidden),
+                                          dtype=np.float32) # batch x seq x hidden size
 
-        if attention_scores is not None:
-            attention_scores = attention_scores.cpu().numpy()
+        # 1. Calculate the attention scores of all the tokens.
+        # Note: You should ensure that the forward pass of your model returns attention scores. Here, we assume it's done.
+        _, attention_scores, _ = self.forward((text_local_indices, None, text_local_indices, aspect_indices, distances_input), output_attentions=True)
+        
+        for batch_i in range(text_local_indices.size(0)):
+            
+            # 2. Compute the mean of the attention scores.
+            mean_attention = attention_scores[batch_i].mean().item()
+            
+            for token_i in range(text_local_indices.size(1)):
+                
+                # 3. Mask the tokens if their attention score is less than the mean.
+                if attention_scores[batch_i][token_i].item() < mean_attention:
+                    masked_text_raw_indices[batch_i][token_i] = np.zeros((self.hidden), dtype=np.float)
 
-        masked_text_raw_indices = np.ones(
-            (text_local_indices.size(0), self.opt.max_seq_len, self.hidden),
-            dtype=np.float32)  # batch_size x seq_len x hidden size
+        return masked_text_raw_indices.to(self.opt.device)
 
-        for text_i, asp_i in zip(range(len(texts)), range(len(asps))):  # For each sample
-            if attention_scores is not None:
-                mean_attention = np.mean(attention_scores[text_i])
-                for i, score in enumerate(attention_scores[text_i]):
-                    if score <= mean_attention:
-                        masked_text_raw_indices[text_i][i] = np.zeros((self.hidden), dtype=np.float)
-
-            # The rest of the code remains the same as your original function...
-            else:
-                asp_len = np.count_nonzero(asps[asp_i])  # Calculate aspect length
-                try:
-                    asp_begin = np.argwhere(texts[text_i] == asps[asp_i][0])[0][0]
-                except:
-                    continue
-                mask_len = self.opt.SRD
-                if asp_begin >= mask_len:
-                    mask_begin = asp_begin - mask_len
-                else:
-                    mask_begin = 0
-                for i in range(mask_begin):  # Masking to the left
-                    masked_text_raw_indices[text_i][i] = np.zeros((self.hidden), dtype=np.float)
-                for j in range(asp_begin + asp_len + mask_len, self.opt.max_seq_len):  # Masking to the right
-                    masked_text_raw_indices[text_i][j] = np.zeros((self.hidden), dtype=np.float)
-        return masked_text_raw_indices
 
 
     def feature_dynamic_weighted(self, text_local_indices, aspect_indices,distances_input=None):

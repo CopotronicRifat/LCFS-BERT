@@ -107,7 +107,8 @@ class LCFS_BERT(nn.Module):
                     masked_text_raw_indices[batch_i][token_i] = np.zeros((self.hidden), dtype=np.float)
 
 
-        return masked_text_raw_indices.to(self.opt.device)
+        return torch.tensor(masked_text_raw_indices).to(self.opt.device)
+
 
 
 

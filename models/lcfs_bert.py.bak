@@ -103,8 +103,9 @@ class LCFS_BERT(nn.Module):
         for batch_i in range(text_local_indices.size(0)):
             mean_attention = attention_scores[batch_i].mean().item()
             for token_i in range(text_local_indices.size(1)):
-                if attention_scores[batch_i][token_i].item() < mean_attention:
+                if attention_scores[batch_i, token_i].item() < mean_attention:  
                     masked_text_raw_indices[batch_i][token_i] = np.zeros((self.hidden), dtype=np.float)
+
 
         return masked_text_raw_indices.to(self.opt.device)
 

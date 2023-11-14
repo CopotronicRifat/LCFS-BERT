@@ -94,10 +94,11 @@ class LCFS_BERT(nn.Module):
         return attention_scores
 
     def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
-    
-            if distances_input is not None:
+        if distances_input is not None:
+            pass
                 # Perform operations involving distances_input
-                pass
+                    
+
         # Assume necessary libraries and self.opt.max_seq_len, self.hidden are defined
         texts = text_local_indices.cpu().numpy()
         asps = aspect_indices.cpu().numpy()

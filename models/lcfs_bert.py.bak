@@ -117,7 +117,7 @@ class LCFS_BERT(nn.Module):
         )
 
         # Constants (Assuming beta, alpha, gamma are defined)
-        beta, alpha, gamma = self.beta, self.alpha, self.gamma
+        beta, alpha, gamma = 1, 1, 1
 
         for batch_i in range(text_local_indices.size(0)):
             for token_i in range(text_local_indices.size(1)):

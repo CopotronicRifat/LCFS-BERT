@@ -92,50 +92,58 @@ class LCFS_BERT(nn.Module):
         )  # This is just an example, adjust as needed
 
         return attention_scores
+        
+    def compute_attention_and_aspect_relevance(self, text_indices, aspect_indices):
+        # Compute attention scores using existing method
+        attention_scores = self.compute_attention_scores(
+            (text_indices, None, text_indices, aspect_indices)
+        )
 
-    def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
-        if distances_input is not None:
-            pass
-                # Perform operations involving distances_input
-                    
+        # Compute embeddings for text and aspects
+        text_embeddings = self.bert_spc(text_indices)[0]  # Assuming [0] returns the last layer's embeddings
+        aspect_embeddings = self.bert_spc(aspect_indices)[0]
 
-        # Assume necessary libraries and self.opt.max_seq_len, self.hidden are defined
+        # Compute similarity between each text token and aspect embeddings
+        similarity_scores = torch.matmul(text_embeddings, aspect_embeddings.transpose(-1, -2))
+
+        # Apply scaling factor beta and softmax to compute aspect relevance
+        beta = self.beta  # Scaling factor, could be a hyperparameter or learnable parameter
+        exp_scores = torch.exp(beta * similarity_scores)
+        aspect_relevance = exp_scores / exp_scores.sum(dim=-1, keepdim=True)
+
+        # Returning attention scores and aspect relevance scores
+        return attention_scores, aspect_relevance
+
+    def feature_dynamic_mask(
+        self, text_local_indices, aspect_indices, distances_input=None
+    ):
         texts = text_local_indices.cpu().numpy()
         asps = aspect_indices.cpu().numpy()
 
-        # Compute contextual embeddings E and attention scores A
-        attention_scores = self.compute_attention_scores(
-            (text_local_indices, None, text_local_indices, aspect_indices)
-        )
+        if isinstance(distances_input, torch.Tensor):
+            distances_input = distances_input.cpu().numpy()
 
-        # Compute embeddings for aspect terms E_A
-        E_A = self.get_aspect_embeddings(aspect_indices)
-
-        # Initialize mask
         masked_text_raw_indices = np.ones(
             (text_local_indices.size(0), self.opt.max_seq_len, self.hidden),
             dtype=np.float32,
         )
 
-        # Constants (Assuming beta, alpha, gamma are defined)
-        beta, alpha, gamma = 1, 1, 1
+        # Compute attention scores and aspect relevance
+        attention_scores, aspect_relevance = self.compute_attention_and_aspect_relevance(
+            text_local_indices, aspect_indices
+        )
 
+        # Iterate over each batch
         for batch_i in range(text_local_indices.size(0)):
             for token_i in range(text_local_indices.size(1)):
-                # Compute relevance R_a for each token
-                relevance = self.aspect_relevance_function(texts[batch_i][token_i], E_A, beta)
+                # Compute dynamic threshold for each token
+                tau = self.alpha * attention_scores[batch_i].mean() + self.gamma * aspect_relevance[batch_i, token_i]
 
-                # Compute dynamic threshold tau
-                mean_attention = attention_scores[batch_i].mean().item()
-                tau = alpha * mean_attention + gamma * relevance
-
-                # Apply masking based on dynamic threshold
-                if attention_scores[batch_i, token_i].item() < tau:
-                    masked_text_raw_indices[batch_i][token_i] = np.zeros(self.hidden, dtype=np.float32)
-
-        # Assuming the necessary return statement here
-        return masked_text_raw_indices
-
+                # Apply masking based on the dynamic threshold
+                if attention_scores[batch_i, token_i] < tau:
+                    masked_text_raw_indices[batch_i][token_i] = np.zeros(
+                        (self.hidden), dtype=np.float32
+                    )
 
         return torch.tensor(masked_text_raw_indices).to(self.opt.device)
 

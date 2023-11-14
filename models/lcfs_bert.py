@@ -58,6 +58,9 @@ class LCFS_BERT(nn.Module):
             hidden = model.config.hidden_size
         elif "xlnet" in opt.pretrained_bert_name:
             hidden = model.config.d_model
+        self.beta = nn.Parameter(torch.tensor(0.1))
+        self.alpha = nn.Parameter(torch.tensor(0.1))
+        self.gamma = nn.Parameter(torch.tensor(0.1))
         self.hidden = hidden
         sa_config = BertConfig(hidden_size=self.hidden, output_attentions=True)
 

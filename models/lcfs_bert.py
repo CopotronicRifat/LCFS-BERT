@@ -92,6 +92,27 @@ class LCFS_BERT(nn.Module):
         )  # This is just an example, adjust as needed
 
         return attention_scores
+        
+    def compute_attention_and_aspect_relevance(self, text_indices, aspect_indices):
+        # Compute attention scores using existing method
+        attention_scores = self.compute_attention_scores(
+            (text_indices, None, text_indices, aspect_indices)
+        )
+
+        # Compute embeddings for text and aspects
+        text_embeddings = self.bert_spc(text_indices)[0]  # Assuming [0] returns the last layer's embeddings
+        aspect_embeddings = self.bert_spc(aspect_indices)[0]
+
+        # Compute similarity between each text token and aspect embeddings
+        similarity_scores = torch.matmul(text_embeddings, aspect_embeddings.transpose(-1, -2))
+
+        # Apply scaling factor beta and softmax to compute aspect relevance
+        beta = self.beta  # Scaling factor, could be a hyperparameter or learnable parameter
+        exp_scores = torch.exp(beta * similarity_scores)
+        aspect_relevance = exp_scores / exp_scores.sum(dim=-1, keepdim=True)
+
+        # Returning attention scores and aspect relevance scores
+        return attention_scores, aspect_relevance
 
     def feature_dynamic_mask(
         self, text_local_indices, aspect_indices, distances_input=None
@@ -107,16 +128,19 @@ class LCFS_BERT(nn.Module):
             dtype=np.float32,
         )
 
-        # Get attention scores without computing mask again
-        attention_scores = self.compute_attention_scores(
-            (text_local_indices, None, text_local_indices, aspect_indices)
+        # Compute attention scores and aspect relevance
+        attention_scores, aspect_relevance = self.compute_attention_and_aspect_relevance(
+            text_local_indices, aspect_indices
         )
 
+        # Iterate over each batch
         for batch_i in range(text_local_indices.size(0)):
-            mean_attention = attention_scores[batch_i].mean().item()
-            mean_attention = mean_attention * self.mask_scalar
             for token_i in range(text_local_indices.size(1)):
-                if attention_scores[batch_i, token_i].item() < mean_attention:
+                # Compute dynamic threshold for each token
+                tau = self.alpha * attention_scores[batch_i].mean() + self.gamma * aspect_relevance[batch_i, token_i]
+
+                # Apply masking based on the dynamic threshold
+                if attention_scores[batch_i, token_i] < tau:
                     masked_text_raw_indices[batch_i][token_i] = np.zeros(
                         (self.hidden), dtype=np.float32
                     )

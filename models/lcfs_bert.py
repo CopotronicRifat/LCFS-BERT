@@ -138,17 +138,20 @@ class LCFS_BERT(nn.Module):
             text_local_indices, aspect_indices
         )
 
-        # Iterate over each batch and token
+        # Iterate over each batch
         for batch_i in range(text_local_indices.size(0)):
             for token_i in range(text_local_indices.size(1)):
                 # Compute dynamic threshold for each token
                 tau = self.alpha * attention_scores[batch_i].mean() + self.gamma * aspect_relevance[batch_i, token_i]
 
-                # Ensure tau is scalar
-                tau_scalar = tau.item() if tau.numel() == 1 else tau
+                # Ensure tau is a scalar
+                tau_scalar = tau.item() if tau.numel() == 1 else tau.squeeze().item()
+
+                # Get the attention score for the current token
+                attention_score = attention_scores[batch_i, token_i].item()
 
                 # Apply masking based on the dynamic threshold
-                if attention_scores[batch_i, token_i].item() < tau_scalar:
+                if attention_score < tau_scalar:
                     masked_text_raw_indices[batch_i][token_i] = np.zeros(self.hidden, dtype=np.float32)
 
         return torch.tensor(masked_text_raw_indices).to(self.opt.device)

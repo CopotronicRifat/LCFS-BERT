@@ -121,6 +121,8 @@ class LCFS_BERT(nn.Module):
                         (self.hidden), dtype=np.float32
                     )
 
+        return torch.tensor(masked_text_raw_indices).to(self.opt.device)
+
     def feature_dynamic_weighted(
         self, text_local_indices, aspect_indices, distances_input=None
     ):

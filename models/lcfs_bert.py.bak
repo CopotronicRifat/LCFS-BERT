@@ -117,9 +117,8 @@ class LCFS_BERT(nn.Module):
         # Returning attention scores and aspect relevance scores
         return attention_scores, aspect_relevance
 
-    def feature_dynamic_mask(
-        self, text_local_indices, aspect_indices, distances_input=None
-    ):
+
+    def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
         texts = text_local_indices.cpu().numpy()
         asps = aspect_indices.cpu().numpy()
 
@@ -142,13 +141,17 @@ class LCFS_BERT(nn.Module):
                 # Compute dynamic threshold for each token
                 tau = self.alpha * attention_scores[batch_i].mean() + self.gamma * aspect_relevance[batch_i, token_i]
 
+                # Make sure tau is a scalar for comparison
+                tau_scalar = tau.item() if tau.numel() == 1 else tau
+
                 # Apply masking based on the dynamic threshold
-                if attention_scores[batch_i, token_i] < tau:
+                if attention_scores[batch_i, token_i].item() < tau_scalar:
                     masked_text_raw_indices[batch_i][token_i] = np.zeros(
                         (self.hidden), dtype=np.float32
                     )
 
         return torch.tensor(masked_text_raw_indices).to(self.opt.device)
+
 
     def feature_dynamic_weighted(
         self, text_local_indices, aspect_indices, distances_input=None

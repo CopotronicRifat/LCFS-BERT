@@ -96,35 +96,38 @@ class LCFS_BERT(nn.Module):
 
         return attention_scores
         
+
+
     def compute_attention_and_aspect_relevance(self, text_indices, aspect_indices):
-        # Compute attention scores using existing method
+        # Compute attention scores
         attention_scores = self.compute_attention_scores(
             (text_indices, None, text_indices, aspect_indices)
         )
 
         # Compute embeddings for text and aspects
-        text_embeddings = self.bert_spc(text_indices)[0]  # Assuming [0] returns the last layer's embeddings
+        text_embeddings = self.bert_spc(text_indices)[0]
         aspect_embeddings = self.bert_spc(aspect_indices)[0]
 
-        # Compute similarity between each text token and aspect embeddings
+        # Compute similarity
         similarity_scores = torch.matmul(text_embeddings, aspect_embeddings.transpose(-1, -2))
 
-        # Apply scaling factor beta and softmax to compute aspect relevance
-        beta = self.beta  # Scaling factor, could be a hyperparameter or learnable parameter
+        # Apply scaling factor beta and softmax
+        beta = self.beta
         exp_scores = torch.exp(beta * similarity_scores)
         aspect_relevance = exp_scores / exp_scores.sum(dim=-1, keepdim=True)
 
-        # Returning attention scores and aspect relevance scores
         return attention_scores, aspect_relevance
 
-
     def feature_dynamic_mask(self, text_local_indices, aspect_indices, distances_input=None):
+        # Ensure tensors are on CPU
         texts = text_local_indices.cpu().numpy()
         asps = aspect_indices.cpu().numpy()
 
+        # Convert distances to numpy if it's a tensor
         if isinstance(distances_input, torch.Tensor):
             distances_input = distances_input.cpu().numpy()
 
+        # Initialize masked text raw indices
         masked_text_raw_indices = np.ones(
             (text_local_indices.size(0), self.opt.max_seq_len, self.hidden),
             dtype=np.float32,
@@ -135,20 +138,18 @@ class LCFS_BERT(nn.Module):
             text_local_indices, aspect_indices
         )
 
-        # Iterate over each batch
+        # Iterate over each batch and token
         for batch_i in range(text_local_indices.size(0)):
             for token_i in range(text_local_indices.size(1)):
                 # Compute dynamic threshold for each token
                 tau = self.alpha * attention_scores[batch_i].mean() + self.gamma * aspect_relevance[batch_i, token_i]
 
-                # Make sure tau is a scalar for comparison
+                # Ensure tau is scalar
                 tau_scalar = tau.item() if tau.numel() == 1 else tau
 
                 # Apply masking based on the dynamic threshold
                 if attention_scores[batch_i, token_i].item() < tau_scalar:
-                    masked_text_raw_indices[batch_i][token_i] = np.zeros(
-                        (self.hidden), dtype=np.float32
-                    )
+                    masked_text_raw_indices[batch_i][token_i] = np.zeros(self.hidden, dtype=np.float32)
 
         return torch.tensor(masked_text_raw_indices).to(self.opt.device)
 

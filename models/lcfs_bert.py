@@ -108,18 +108,16 @@ class LCFS_BERT(nn.Module):
         text_embeddings = self.bert_spc(text_indices)[0]
         aspect_embeddings = self.bert_spc(aspect_indices)[0]
 
+        # Compute similarity scores
         similarity_scores = torch.matmul(text_embeddings, aspect_embeddings.transpose(-1, -2))
-
-        # The similarity_scores tensor might have incorrect dimensions here.
-        # You need to ensure that it has dimensions [batch_size, seq_len, num_aspects]
-        # or similar, so that each token has a single similarity score per aspect term.
 
         # Apply scaling factor beta and softmax to compute aspect relevance
         beta = self.beta
         exp_scores = torch.exp(beta * similarity_scores)
-
-        # Ensure that softmax is applied in such a way that each token gets a single relevance score
         aspect_relevance = exp_scores / exp_scores.sum(dim=-1, keepdim=True)
+
+        # Ensure that each token gets a single relevance score
+        aspect_relevance = aspect_relevance.max(dim=-1)[0]  # Adjust as needed
 
         return attention_scores, aspect_relevance
 
@@ -145,17 +143,16 @@ class LCFS_BERT(nn.Module):
 
         # Iterate over each batch
         for batch_i in range(text_local_indices.size(0)):
-            mean_attention_score = attention_scores[batch_i].mean().item()
             for token_i in range(text_local_indices.size(1)):
                 # Compute dynamic threshold for each token
-                aspect_relevance_score = aspect_relevance[batch_i, token_i].item() if aspect_relevance[batch_i, token_i].numel() == 1 else aspect_relevance[batch_i, token_i].squeeze().item()
-                tau = self.alpha * mean_attention_score + self.gamma * aspect_relevance_score
-
-                # Get the attention score for the current token
-                attention_score = attention_scores[batch_i, token_i].item()
+                # Ensuring that aspect_relevance_score is a scalar
+                aspect_relevance_score = aspect_relevance[batch_i, token_i]
+                if aspect_relevance_score.numel() > 1:
+                    aspect_relevance_score = aspect_relevance_score.mean()  # or any other suitable reduction
+                tau = self.alpha * attention_scores[batch_i].mean() + self.gamma * aspect_relevance_score
 
                 # Apply masking based on the dynamic threshold
-                if attention_score < tau:
+                if attention_scores[batch_i, token_i] < tau:
                     masked_text_raw_indices[batch_i][token_i] = np.zeros(self.hidden, dtype=np.float32)
 
         return torch.tensor(masked_text_raw_indices).to(self.opt.device)

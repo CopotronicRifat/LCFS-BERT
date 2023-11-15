@@ -116,7 +116,7 @@ class LCFS_BERT(nn.Module):
         # or similar, so that each token has a single similarity score per aspect term.
 
         # Apply scaling factor beta and softmax to compute aspect relevance
-
+        beta = self.beta
         exp_scores = torch.exp(beta * similarity_scores)
 
         # Ensure that softmax is applied in such a way that each token gets a single relevance score

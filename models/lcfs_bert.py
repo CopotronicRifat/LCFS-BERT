@@ -108,7 +108,6 @@ class LCFS_BERT(nn.Module):
         text_embeddings = self.bert_spc(text_indices)[0]
         aspect_embeddings = self.bert_spc(aspect_indices)[0]
 
-        # Compute similarity scores
         similarity_scores = torch.matmul(text_embeddings, aspect_embeddings.transpose(-1, -2))
 
         # The similarity_scores tensor might have incorrect dimensions here.

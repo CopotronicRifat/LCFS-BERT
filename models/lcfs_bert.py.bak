@@ -136,7 +136,7 @@ class LCFS_BERT(nn.Module):
             dtype=np.float32,
         )
 
-    # Compute attention scores and aspect relevance
+        # Compute attention scores and aspect relevance
         attention_scores, aspect_relevance = self.compute_attention_and_aspect_relevance(
             text_local_indices, aspect_indices
         )

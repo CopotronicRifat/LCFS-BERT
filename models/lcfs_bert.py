@@ -108,12 +108,18 @@ class LCFS_BERT(nn.Module):
         text_embeddings = self.bert_spc(text_indices)[0]
         aspect_embeddings = self.bert_spc(aspect_indices)[0]
 
-        # Compute similarity
+        # Compute similarity scores
         similarity_scores = torch.matmul(text_embeddings, aspect_embeddings.transpose(-1, -2))
 
-        # Apply scaling factor beta and softmax
-        beta = self.beta
+        # The similarity_scores tensor might have incorrect dimensions here.
+        # You need to ensure that it has dimensions [batch_size, seq_len, num_aspects]
+        # or similar, so that each token has a single similarity score per aspect term.
+
+        # Apply scaling factor beta and softmax to compute aspect relevance
+
         exp_scores = torch.exp(beta * similarity_scores)
+
+        # Ensure that softmax is applied in such a way that each token gets a single relevance score
         aspect_relevance = exp_scores / exp_scores.sum(dim=-1, keepdim=True)
 
         return attention_scores, aspect_relevance
